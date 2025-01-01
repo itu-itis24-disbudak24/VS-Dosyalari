@@ -26,7 +26,7 @@ function checkPrediction(event){
     
     event.preventDefault();
     for(i=0;i<5;i++){
-        if (letters[i] == userInput.value && !foundLetters.includes(letters[i]) ){
+        if ((letters[i] == userInput.value || letters[i].toUpperCase()) && !foundLetters.includes(letters[i]) ){
 
             boxes[i].style.visibility = "hidden";
             drawings[i].style.visibility = "visible";
