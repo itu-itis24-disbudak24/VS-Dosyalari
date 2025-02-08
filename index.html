@@ -96,7 +96,7 @@
     <button onclick="encryptMessage()">Şifrele</button>
     
     <label for="encryptedOutput">Oluşturulan Şifre (kitaba yazılacak):</label>
-    <!-- Final kodda boşluk karakteri olmayacak, çünkü şifreleme sırasında boşluklar "XQ" ile kodlanıyor. -->
+    <!-- Final şifrede boşluk karakteri olmayacak -->
     <input type="text" id="encryptedOutput" readonly>
   </div>
   
@@ -134,10 +134,8 @@
     return result;
   }
   
-  /* --- Vigenère Şifreleme (boşluklar "XQ" ile kodlanıyor) --- */
+  /* --- Vigenère Şifreleme (Boşluklar 1 harf "Q" ile kodlanıyor) --- */
   function encryptText(text, key) {
-    // Öncelikle, orijinal mesajda "XQ" varsa, bunu çiftleyerek kaçırıyoruz.
-    text = text.replace(/XQ/g, 'XQXQ');
     text = text.toUpperCase();
     key = key.toUpperCase();
     let result = '';
@@ -145,23 +143,29 @@
     for (let i = 0; i < text.length; i++) {
       let c = text[i];
       if (c === ' ') {
-        // Boşluk karakterini "XQ" olarak kodluyoruz.
-        result += 'XQ';
+        // Orijinal mesajdaki boşluğu, final koda tek harf "Q" olarak ekliyoruz.
+        result += 'Q';
       } else if (c >= 'A' && c <= 'Z') {
         let mVal = c.charCodeAt(0) - 65;
         let kVal = key.charCodeAt(keyIndex % key.length) - 65;
         let encVal = (mVal + kVal) % 26;
-        result += String.fromCharCode(encVal + 65);
+        let encLetter = String.fromCharCode(encVal + 65);
+        // Eğer şifrelenmiş harf "Q" çıkarsa, bunu ayırt edebilmek için çift "QQ" olarak ekliyoruz.
+        if (encLetter === 'Q') {
+          result += 'QQ';
+        } else {
+          result += encLetter;
+        }
         keyIndex++;
       } else {
-        // Harf olmayan karakterleri (noktalama, rakam vb.) direkt ekliyoruz.
+        // Harf olmayan karakterler (noktalama, rakam vb.) direkt eklenir.
         result += c;
       }
     }
     return result;
   }
   
-  /* --- Vigenère Şifre Çözme (kodlanmış "XQ" boşlukları orijinal hale döndürülüyor) --- */
+  /* --- Vigenère Şifre Çözme (Kodlanmış "Q" markerları orijinal boşluk olarak geri döndürülüyor) --- */
   function decryptText(cipher, key) {
     cipher = cipher.toUpperCase();
     key = key.toUpperCase();
@@ -169,11 +173,23 @@
     let keyIndex = 0;
     let i = 0;
     while (i < cipher.length) {
-      // Eğer iki karakterlik kısım "XQ" ise, bu kodlanmış boşluktur.
-      if (i <= cipher.length - 2 && cipher.substring(i, i + 2) === 'XQ') {
-        result += ' ';
-        i += 2;
+      if (cipher[i] === 'Q') {
+        // Eğer "Q" tek başına geliyorsa, bu orijinal boşluktur.
+        if (i + 1 >= cipher.length || cipher[i + 1] !== 'Q') {
+          result += ' ';
+          i++;
+        } else {
+          // Eğer "QQ" ise, bu şifrelenmiş harf Q'dur.
+          let c = 'Q';
+          let cVal = c.charCodeAt(0) - 65;
+          let kVal = key.charCodeAt(keyIndex % key.length) - 65;
+          let mVal = (cVal - kVal + 26) % 26;
+          result += String.fromCharCode(mVal + 65);
+          keyIndex++;
+          i += 2;
+        }
       } else {
+        // Normal harfler için Vigenère şifre çözümü
         let c = cipher[i];
         if (c >= 'A' && c <= 'Z') {
           let cVal = c.charCodeAt(0) - 65;
@@ -187,8 +203,6 @@
         i++;
       }
     }
-    // Kaçırdığımız "XQ" markerlarının orijinalini geri getirmek için:
-    result = result.replace(/XQXQ/g, 'XQ');
     return result;
   }
   
@@ -251,7 +265,6 @@
         alert("Lütfen mesajın açılacağı tarihi seçin.");
         return;
       }
-      // customDate formatı "YYYY-MM-DD". Ay ve günü alıyoruz.
       const dateObj = new Date(customDate);
       const month = dateObj.getMonth() + 1;
       const day = dateObj.getDate();
@@ -261,20 +274,16 @@
     const encryptedText = encryptText(plainText, key);
     let finalCode = '';
     if (msgType === 'custom') {
-      // Özel tarih: prefix 'D', 4 harf key, 4 harf tarih kodu, sonra şifreli metin
       finalCode = prefix + key + extraData + encryptedText;
     } else {
-      // Anlık ve doğum günü: prefix, 4 harf key, şifreli metin
       finalCode = prefix + key + encryptedText;
     }
-    // Final kodun tamamı sadece harflerden oluşur (boşluklar "XQ" ile kodlanmıştır).
     document.getElementById('encryptedOutput').value = finalCode;
   }
   
   /* --- Gerçek Tarihi Al (timeapi.io üzerinden) --- */
   async function getRealDate() {
     try {
-      // timeapi.io, UTC zamanını JSON formatında döndürür.
       const response = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=UTC');
       if (!response.ok) {
         throw new Error("Network response was not ok");
@@ -309,22 +318,19 @@
     let expectedMonth, expectedDay;
     
     if (prefix === 'I') {
-      // Anlık mesaj: "I" + 4 harf key + şifreli metin
       key = encryptedInput.substring(1, 5);
       cipherText = encryptedInput.substring(5);
     } else if (prefix === 'M' || prefix === 'F') {
-      // Doğum günü mesajları: "M"/"F" + 4 harf key + şifreli metin
       key = encryptedInput.substring(1, 5);
       cipherText = encryptedInput.substring(5);
       if (prefix === 'M') {
         expectedMonth = 1;
         expectedDay = 14;
-      } else { // 'F'
+      } else {
         expectedMonth = 6;
         expectedDay = 13;
       }
     } else if (prefix === 'D') {
-      // Özel tarih mesajı: "D" + 4 harf key + 4 harf tarih kodu + şifreli metin
       if (encryptedInput.length < 9) {
         alert("Geçersiz şifre formatı.");
         return;
@@ -344,7 +350,6 @@
       return;
     }
     
-    // Anlık mesajlar dışındaki mesajlar için gerçek tarihi kontrol et
     if (prefix !== 'I') {
       try {
         const realDate = await getRealDate();
@@ -359,7 +364,7 @@
           return;
         }
       } catch (error) {
-        return; // getRealDate içindeki alert yeterli.
+        return;
       }
     }
     
@@ -369,4 +374,5 @@
 </script>
 </body>
 </html>
+
 
