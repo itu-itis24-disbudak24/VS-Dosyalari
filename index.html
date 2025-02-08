@@ -96,6 +96,7 @@
     <button onclick="encryptMessage()">Şifrele</button>
     
     <label for="encryptedOutput">Oluşturulan Şifre (kitaba yazılacak):</label>
+    <!-- Final kodda boşluk karakteri olmayacak, çünkü şifreleme sırasında boşluklar "XQ" ile kodlanıyor. -->
     <input type="text" id="encryptedOutput" readonly>
   </div>
   
@@ -133,45 +134,61 @@
     return result;
   }
   
-  /* --- Vigenère Şifreleme --- */
+  /* --- Vigenère Şifreleme (boşluklar "XQ" ile kodlanıyor) --- */
   function encryptText(text, key) {
+    // Öncelikle, orijinal mesajda "XQ" varsa, bunu çiftleyerek kaçırıyoruz.
+    text = text.replace(/XQ/g, 'XQXQ');
     text = text.toUpperCase();
     key = key.toUpperCase();
     let result = '';
     let keyIndex = 0;
     for (let i = 0; i < text.length; i++) {
       let c = text[i];
-      if (c >= 'A' && c <= 'Z') {
+      if (c === ' ') {
+        // Boşluk karakterini "XQ" olarak kodluyoruz.
+        result += 'XQ';
+      } else if (c >= 'A' && c <= 'Z') {
         let mVal = c.charCodeAt(0) - 65;
         let kVal = key.charCodeAt(keyIndex % key.length) - 65;
         let encVal = (mVal + kVal) % 26;
         result += String.fromCharCode(encVal + 65);
         keyIndex++;
       } else {
+        // Harf olmayan karakterleri (noktalama, rakam vb.) direkt ekliyoruz.
         result += c;
       }
     }
     return result;
   }
   
-  /* --- Vigenère Şifre Çözme --- */
+  /* --- Vigenère Şifre Çözme (kodlanmış "XQ" boşlukları orijinal hale döndürülüyor) --- */
   function decryptText(cipher, key) {
     cipher = cipher.toUpperCase();
     key = key.toUpperCase();
     let result = '';
     let keyIndex = 0;
-    for (let i = 0; i < cipher.length; i++) {
-      let c = cipher[i];
-      if (c >= 'A' && c <= 'Z') {
-        let cVal = c.charCodeAt(0) - 65;
-        let kVal = key.charCodeAt(keyIndex % key.length) - 65;
-        let mVal = (cVal - kVal + 26) % 26;
-        result += String.fromCharCode(mVal + 65);
-        keyIndex++;
+    let i = 0;
+    while (i < cipher.length) {
+      // Eğer iki karakterlik kısım "XQ" ise, bu kodlanmış boşluktur.
+      if (i <= cipher.length - 2 && cipher.substring(i, i + 2) === 'XQ') {
+        result += ' ';
+        i += 2;
       } else {
-        result += c;
+        let c = cipher[i];
+        if (c >= 'A' && c <= 'Z') {
+          let cVal = c.charCodeAt(0) - 65;
+          let kVal = key.charCodeAt(keyIndex % key.length) - 65;
+          let mVal = (cVal - kVal + 26) % 26;
+          result += String.fromCharCode(mVal + 65);
+          keyIndex++;
+        } else {
+          result += c;
+        }
+        i++;
       }
     }
+    // Kaçırdığımız "XQ" markerlarının orijinalini geri getirmek için:
+    result = result.replace(/XQXQ/g, 'XQ');
     return result;
   }
   
@@ -247,9 +264,10 @@
       // Özel tarih: prefix 'D', 4 harf key, 4 harf tarih kodu, sonra şifreli metin
       finalCode = prefix + key + extraData + encryptedText;
     } else {
-      // Anlık ve ön tanımlı doğum günü: prefix, 4 harf key, şifreli metin
+      // Anlık ve doğum günü: prefix, 4 harf key, şifreli metin
       finalCode = prefix + key + encryptedText;
     }
+    // Final kodun tamamı sadece harflerden oluşur (boşluklar "XQ" ile kodlanmıştır).
     document.getElementById('encryptedOutput').value = finalCode;
   }
   
@@ -262,7 +280,6 @@
         throw new Error("Network response was not ok");
       }
       const data = await response.json();
-      // Örnek JSON: { "year":2025, "month":2, "day":8, "hour":12, "minute":34, "seconds":56, "milliSeconds":789, ... }
       const utcDate = new Date(Date.UTC(
         data.year,
         data.month - 1,
@@ -352,3 +369,4 @@
 </script>
 </body>
 </html>
+
