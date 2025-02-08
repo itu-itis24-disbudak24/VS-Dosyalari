@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Mesaj Şifreleme ve Çözme</title>
+  <style>
+    /* Genel sayfa stili */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #74ABE2, #5563DE);
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 20px 30px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #444;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+    input[type="text"],
+    input[type="date"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      background-color: #5563DE;
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      margin-top: 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      display: block;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #435bb5;
+    }
+    .section {
+      margin-bottom: 40px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Mesaj Şifreleme ve Çözme</h1>
+  
+  <!-- Şifreleme Bölümü -->
+  <div class="section" id="encryptionSection">
+    <h2>Mesaj Şifrele</h2>
+    <label for="plainText">Mesajınız:</label>
+    <textarea id="plainText" placeholder="Buraya mesajınızı yazın..."></textarea>
+    
+    <label for="msgTypeEnc">Mesaj Tipi:</label>
+    <select id="msgTypeEnc" onchange="toggleEncryptionOptions()">
+      <option value="instant">Anlık (her zaman çözülebilir)</option>
+      <option value="birthday">Doğum Günü (Ön Tanımlı)</option>
+      <option value="custom">Özel Tarih</option>
+    </select>
+    
+    <!-- Doğum günü seçenekleri -->
+    <div id="birthdayOptionsEnc" style="display:none;">
+      <label for="whoseBirthdayEnc">Hangi doğum günü için:</label>
+      <select id="whoseBirthdayEnc">
+        <option value="M">Benim (14 Ocak)</option>
+        <option value="F">Arkadaşım (13 Haziran)</option>
+      </select>
+    </div>
+    
+    <!-- Özel tarih seçeneği -->
+    <div id="customDateOptionEnc" style="display:none;">
+      <label for="customDateEnc">Mesajın açılacağı tarihi seçin:</label>
+      <input type="date" id="customDateEnc">
+    </div>
+    
+    <button onclick="encryptMessage()">Şifrele</button>
+    
+    <label for="encryptedOutput">Oluşturulan Şifre (kitaba yazılacak):</label>
+    <input type="text" id="encryptedOutput" readonly>
+  </div>
+  
+  <!-- Çözme Bölümü -->
+  <div class="section" id="decryptionSection">
+    <h2>Mesaj Çöz</h2>
+    <label for="encryptedInput">Şifreyi giriniz:</label>
+    <input type="text" id="encryptedInput" placeholder="Kitabınızda yazılı şifreyi girin...">
+    
+    <button onclick="decryptMessage()">Çöz</button>
+    
+    <label for="decryptedOutput">Çözülen Mesaj:</label>
+    <textarea id="decryptedOutput" readonly></textarea>
+  </div>
+</div>
+
+<script>
+  /* --- Harf-Dijit Haritalaması --- */
+  const digitToLetter = {
+    '0': 'A', '1': 'B', '2': 'C', '3': 'D', '4': 'E',
+    '5': 'F', '6': 'G', '7': 'H', '8': 'I', '9': 'J'
+  };
+  const letterToDigit = {
+    'A': '0', 'B': '1', 'C': '2', 'D': '3', 'E': '4',
+    'F': '5', 'G': '6', 'H': '7', 'I': '8', 'J': '9'
+  };
+
+  /* --- Rastgele Key Üretimi --- */
+  function randomKey(length) {
+    let result = '';
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    for (let i = 0; i < length; i++) {
+      result += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    return result;
+  }
+  
+  /* --- Vigenère Şifreleme --- */
+  function encryptText(text, key) {
+    text = text.toUpperCase();
+    key = key.toUpperCase();
+    let result = '';
+    let keyIndex = 0;
+    for (let i = 0; i < text.length; i++) {
+      let c = text[i];
+      if (c >= 'A' && c <= 'Z') {
+        let mVal = c.charCodeAt(0) - 65;
+        let kVal = key.charCodeAt(keyIndex % key.length) - 65;
+        let encVal = (mVal + kVal) % 26;
+        result += String.fromCharCode(encVal + 65);
+        keyIndex++;
+      } else {
+        result += c;
+      }
+    }
+    return result;
+  }
+  
+  /* --- Vigenère Şifre Çözme --- */
+  function decryptText(cipher, key) {
+    cipher = cipher.toUpperCase();
+    key = key.toUpperCase();
+    let result = '';
+    let keyIndex = 0;
+    for (let i = 0; i < cipher.length; i++) {
+      let c = cipher[i];
+      if (c >= 'A' && c <= 'Z') {
+        let cVal = c.charCodeAt(0) - 65;
+        let kVal = key.charCodeAt(keyIndex % key.length) - 65;
+        let mVal = (cVal - kVal + 26) % 26;
+        result += String.fromCharCode(mVal + 65);
+        keyIndex++;
+      } else {
+        result += c;
+      }
+    }
+    return result;
+  }
+  
+  /* --- Seçeneklerin Gösterimi --- */
+  function toggleEncryptionOptions() {
+    const msgType = document.getElementById('msgTypeEnc').value;
+    const birthdayDiv = document.getElementById('birthdayOptionsEnc');
+    const customDateDiv = document.getElementById('customDateOptionEnc');
+    if (msgType === 'birthday') {
+      birthdayDiv.style.display = 'block';
+      customDateDiv.style.display = 'none';
+    } else if (msgType === 'custom') {
+      birthdayDiv.style.display = 'none';
+      customDateDiv.style.display = 'block';
+    } else {
+      birthdayDiv.style.display = 'none';
+      customDateDiv.style.display = 'none';
+    }
+  }
+  
+  /* --- Tarih Kodlaması (MMDD -> 4 Harf) --- */
+  function encodeDate(month, day) {
+    let mm = month.toString().padStart(2, '0');
+    let dd = day.toString().padStart(2, '0');
+    let encoded = '';
+    for (let ch of mm + dd) {
+      encoded += digitToLetter[ch];
+    }
+    return encoded;
+  }
+  
+  /* --- Tarih Çözümleme --- */
+  function decodeDate(encoded) {
+    if (encoded.length !== 4) return null;
+    let digits = '';
+    for (let ch of encoded) {
+      if (!(ch in letterToDigit)) return null;
+      digits += letterToDigit[ch];
+    }
+    let month = parseInt(digits.substring(0, 2), 10);
+    let day = parseInt(digits.substring(2, 4), 10);
+    return { month, day };
+  }
+  
+  /* --- Mesaj Şifreleme Fonksiyonu --- */
+  function encryptMessage() {
+    const plainText = document.getElementById('plainText').value;
+    const msgType = document.getElementById('msgTypeEnc').value;
+    let prefix = '';
+    let extraData = ''; // Özel tarih için 4 harfli kod
+    if (msgType === 'instant') {
+      prefix = 'I';
+    } else if (msgType === 'birthday') {
+      const birthdayFor = document.getElementById('whoseBirthdayEnc').value;
+      prefix = birthdayFor; // 'M' veya 'F'
+    } else if (msgType === 'custom') {
+      prefix = 'D';
+      const customDate = document.getElementById('customDateEnc').value;
+      if (!customDate) {
+        alert("Lütfen mesajın açılacağı tarihi seçin.");
+        return;
+      }
+      // customDate formatı "YYYY-MM-DD". Ay ve günü alıyoruz.
+      const dateObj = new Date(customDate);
+      const month = dateObj.getMonth() + 1;
+      const day = dateObj.getDate();
+      extraData = encodeDate(month, day); // 4 harfli tarih kodu
+    }
+    const key = randomKey(4);
+    const encryptedText = encryptText(plainText, key);
+    let finalCode = '';
+    if (msgType === 'custom') {
+      // Özel tarih: prefix 'D', 4 harf key, 4 harf tarih kodu, sonra şifreli metin
+      finalCode = prefix + key + extraData + encryptedText;
+    } else {
+      // Anlık ve ön tanımlı doğum günü: prefix, 4 harf key, şifreli metin
+      finalCode = prefix + key + encryptedText;
+    }
+    document.getElementById('encryptedOutput').value = finalCode;
+  }
+  
+  /* --- Gerçek Tarihi Al (AllOrigins üzerinden worldtimeapi.org'dan) --- */
+  async function getRealDate() {
+    try {
+      // AllOrigins: CORS kısıtlamalarını aşmak için kullanıyoruz.
+      const apiUrl = 'https://worldtimeapi.org/api/timezone/Etc/UTC';
+      const proxyUrl = 'https://api.allorigins.hexocode.repl.co/get?disableCache=true&url=' + encodeURIComponent(apiUrl);
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+      const data = await response.json();
+      // AllOrigins, orijinal API yanıtını "contents" adlı alanda string olarak döndürür.
+      const parsed = JSON.parse(data.contents);
+      return new Date(parsed.datetime);
+    } catch (error) {
+      alert("Gerçek tarih alınamadı. İnternet bağlantınızı kontrol edin.");
+      throw error;
+    }
+  }
+  
+  /* --- Mesaj Şifre Çözme Fonksiyonu --- */
+  async function decryptMessage() {
+    const encryptedInput = document.getElementById('encryptedInput').value.trim().toUpperCase();
+    if (encryptedInput.length < 5) {
+      alert("Geçerli bir şifre giriniz.");
+      return;
+    }
+    const prefix = encryptedInput.charAt(0);
+    let key = '';
+    let cipherText = '';
+    let expectedMonth, expectedDay;
+    
+    if (prefix === 'I') {
+      // Anlık mesaj: "I" + 4 harf key + şifreli metin
+      key = encryptedInput.substring(1, 5);
+      cipherText = encryptedInput.substring(5);
+    } else if (prefix === 'M' || prefix === 'F') {
+      // Doğum günü mesajları: "M"/"F" + 4 harf key + şifreli metin
+      key = encryptedInput.substring(1, 5);
+      cipherText = encryptedInput.substring(5);
+      if (prefix === 'M') {
+        expectedMonth = 1;
+        expectedDay = 14;
+      } else { // 'F'
+        expectedMonth = 6;
+        expectedDay = 13;
+      }
+    } else if (prefix === 'D') {
+      // Özel tarih mesajı: "D" + 4 harf key + 4 harf tarih kodu + şifreli metin
+      if (encryptedInput.length < 9) {
+        alert("Geçersiz şifre formatı.");
+        return;
+      }
+      key = encryptedInput.substring(1, 5);
+      const encodedDate = encryptedInput.substring(5, 9);
+      cipherText = encryptedInput.substring(9);
+      const decoded = decodeDate(encodedDate);
+      if (!decoded) {
+        alert("Geçersiz tarih kodu.");
+        return;
+      }
+      expectedMonth = decoded.month;
+      expectedDay = decoded.day;
+    } else {
+      alert("Geçersiz şifre formatı.");
+      return;
+    }
+    
+    // Anlık mesajlar dışındaki mesajlar için gerçek tarihi kontrol et
+    if (prefix !== 'I') {
+      try {
+        const realDate = await getRealDate();
+        const currentMonth = realDate.getUTCMonth() + 1;
+        const currentDay = realDate.getUTCDate();
+        if (currentMonth !== expectedMonth || currentDay !== expectedDay) {
+          if (prefix === 'D') {
+            alert("Henüz belirlenen tarih gelmedi.");
+          } else {
+            alert("Henüz doğum günü gelmedi.");
+          }
+          return;
+        }
+      } catch (error) {
+        return; // getRealDate içindeki alert yeterli.
+      }
+    }
+    
+    const decryptedMessage = decryptText(cipherText, key);
+    document.getElementById('decryptedOutput').value = decryptedMessage;
+  }
+</script>
+</body>
+</html>
