@@ -96,7 +96,7 @@
     <button onclick="encryptMessage()">Şifrele</button>
     
     <label for="encryptedOutput">Oluşturulan Şifre (kitaba yazılacak):</label>
-    <!-- Final şifrede boşluk karakteri olmayacak -->
+    <!-- Final şifre, escape uygulanmış halde, Q, W, X harfleri içermeyecektir. -->
     <input type="text" id="encryptedOutput" readonly>
   </div>
   
@@ -125,17 +125,24 @@
   };
 
   /* --- Rastgele Key Üretimi --- */
+  // Artık anahtar, Q, W, X harfleri hariç "ABCDEFGHIJKLMNOPRSTUVYZ" karakterlerinden üretiliyor.
   function randomKey(length) {
     let result = '';
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const letters = "ABCDEFGHIJKLMNOPRSTUVYZ";
     for (let i = 0; i < length; i++) {
       result += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     return result;
   }
   
-  /* --- Vigenère Şifreleme (Boşluklar 1 harf "Q" ile kodlanıyor) --- */
+  /* --- Boşluk Marker’ı --- */
+  // Orijinal kodda boşluklar "XQ" ile kodlanıyordu, fakat Q ve X kullanılamayacağından SPACE_MARKER olarak "IJ" belirlenmiştir.
+  const SPACE_MARKER = "IJ";
+  
+  /* --- Vigenère Şifreleme (Boşluklar SPACE_MARKER ile kodlanıyor) --- */
   function encryptText(text, key) {
+    // Orijinal metinde SPACE_MARKER ("IJ") varsa, bunları kaçırmak için çiftleniyor.
+    text = text.replace(/IJ/g, 'IJIJ');
     text = text.toUpperCase();
     key = key.toUpperCase();
     let result = '';
@@ -143,29 +150,21 @@
     for (let i = 0; i < text.length; i++) {
       let c = text[i];
       if (c === ' ') {
-        // Orijinal mesajdaki boşluğu, final koda tek harf "Q" olarak ekliyoruz.
-        result += 'Q';
+        result += SPACE_MARKER;
       } else if (c >= 'A' && c <= 'Z') {
         let mVal = c.charCodeAt(0) - 65;
         let kVal = key.charCodeAt(keyIndex % key.length) - 65;
         let encVal = (mVal + kVal) % 26;
-        let encLetter = String.fromCharCode(encVal + 65);
-        // Eğer şifrelenmiş harf "Q" çıkarsa, bunu ayırt edebilmek için çift "QQ" olarak ekliyoruz.
-        if (encLetter === 'Q') {
-          result += 'QQ';
-        } else {
-          result += encLetter;
-        }
+        result += String.fromCharCode(encVal + 65);
         keyIndex++;
       } else {
-        // Harf olmayan karakterler (noktalama, rakam vb.) direkt eklenir.
         result += c;
       }
     }
     return result;
   }
   
-  /* --- Vigenère Şifre Çözme (Kodlanmış "Q" markerları orijinal boşluk olarak geri döndürülüyor) --- */
+  /* --- Vigenère Şifre Çözme (SPACE_MARKER çözümleniyor) --- */
   function decryptText(cipher, key) {
     cipher = cipher.toUpperCase();
     key = key.toUpperCase();
@@ -173,23 +172,10 @@
     let keyIndex = 0;
     let i = 0;
     while (i < cipher.length) {
-      if (cipher[i] === 'Q') {
-        // Eğer "Q" tek başına geliyorsa, bu orijinal boşluktur.
-        if (i + 1 >= cipher.length || cipher[i + 1] !== 'Q') {
-          result += ' ';
-          i++;
-        } else {
-          // Eğer "QQ" ise, bu şifrelenmiş harf Q'dur.
-          let c = 'Q';
-          let cVal = c.charCodeAt(0) - 65;
-          let kVal = key.charCodeAt(keyIndex % key.length) - 65;
-          let mVal = (cVal - kVal + 26) % 26;
-          result += String.fromCharCode(mVal + 65);
-          keyIndex++;
-          i += 2;
-        }
+      if (i <= cipher.length - 2 && cipher.substring(i, i + 2) === SPACE_MARKER) {
+        result += ' ';
+        i += 2;
       } else {
-        // Normal harfler için Vigenère şifre çözümü
         let c = cipher[i];
         if (c >= 'A' && c <= 'Z') {
           let cVal = c.charCodeAt(0) - 65;
@@ -201,6 +187,47 @@
           result += c;
         }
         i++;
+      }
+    }
+    // Kaçırılan SPACE_MARKER'ların geri getirilmesi:
+    result = result.replace(/IJIJ/g, 'IJ');
+    return result;
+  }
+  
+  /* --- Forbidden Harflerin (Q, W, X, ve ayrıca escape için Z) Escape Edilmesi --- */
+  // Final şifrede Q, W, X harfleri bulunmamalı. Bunun için escape algoritması kullanıyoruz.
+  function escapeForbidden(s) {
+    let result = "";
+    for (let i = 0; i < s.length; i++) {
+      let c = s[i];
+      if (c === 'Q') {
+        result += "ZA";
+      } else if (c === 'W') {
+        result += "ZB";
+      } else if (c === 'X') {
+        result += "ZC";
+      } else if (c === 'Z') {
+        result += "ZD";
+      } else {
+        result += c;
+      }
+    }
+    return result;
+  }
+  function unescapeForbidden(s) {
+    let result = "";
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === 'Z') {
+        if (i + 1 < s.length) {
+          let next = s[i + 1];
+          if (next === 'A') { result += 'Q'; i++; continue; }
+          else if (next === 'B') { result += 'W'; i++; continue; }
+          else if (next === 'C') { result += 'X'; i++; continue; }
+          else if (next === 'D') { result += 'Z'; i++; continue; }
+          else { result += s[i]; }
+        } else { result += s[i]; }
+      } else {
+        result += s[i];
       }
     }
     return result;
@@ -227,17 +254,15 @@
   function encodeDate(month, day) {
     let mm = month.toString().padStart(2, '0');
     let dd = day.toString().padStart(2, '0');
-    let encoded = '';
+    let encoded = "";
     for (let ch of mm + dd) {
       encoded += digitToLetter[ch];
     }
     return encoded;
   }
-  
-  /* --- Tarih Çözümleme --- */
   function decodeDate(encoded) {
     if (encoded.length !== 4) return null;
-    let digits = '';
+    let digits = "";
     for (let ch of encoded) {
       if (!(ch in letterToDigit)) return null;
       digits += letterToDigit[ch];
@@ -251,8 +276,8 @@
   function encryptMessage() {
     const plainText = document.getElementById('plainText').value;
     const msgType = document.getElementById('msgTypeEnc').value;
-    let prefix = '';
-    let extraData = ''; // Özel tarih için 4 harfli kod
+    let prefix = "";
+    let extraData = ""; // Özel tarih için 4 harfli kod
     if (msgType === 'instant') {
       prefix = 'I';
     } else if (msgType === 'birthday') {
@@ -268,17 +293,87 @@
       const dateObj = new Date(customDate);
       const month = dateObj.getMonth() + 1;
       const day = dateObj.getDate();
-      extraData = encodeDate(month, day); // 4 harfli tarih kodu
+      extraData = encodeDate(month, day);
     }
     const key = randomKey(4);
     const encryptedText = encryptText(plainText, key);
-    let finalCode = '';
+    let finalCode = "";
     if (msgType === 'custom') {
       finalCode = prefix + key + extraData + encryptedText;
     } else {
       finalCode = prefix + key + encryptedText;
     }
+    // Escape forbidden harfleri (Q, W, X, Z) final koda uyguluyoruz.
+    finalCode = escapeForbidden(finalCode);
     document.getElementById('encryptedOutput').value = finalCode;
+  }
+  
+  /* --- Mesaj Şifre Çözme Fonksiyonu --- */
+  async function decryptMessage() {
+    let encryptedInput = document.getElementById('encryptedInput').value.trim().toUpperCase();
+    // Önce, escape dönüşümüyle orijinal final koda geri alınıyor.
+    encryptedInput = unescapeForbidden(encryptedInput);
+    if (encryptedInput.length < 5) {
+      alert("Geçerli bir şifre giriniz.");
+      return;
+    }
+    const prefix = encryptedInput.charAt(0);
+    let key = "";
+    let cipherText = "";
+    let expectedMonth, expectedDay;
+    
+    if (prefix === 'I') {
+      key = encryptedInput.substring(1, 5);
+      cipherText = encryptedInput.substring(5);
+    } else if (prefix === 'M' || prefix === 'F') {
+      key = encryptedInput.substring(1, 5);
+      cipherText = encryptedInput.substring(5);
+      if (prefix === 'M') {
+        expectedMonth = 1; expectedDay = 14;
+      } else {
+        expectedMonth = 6; expectedDay = 13;
+      }
+    } else if (prefix === 'D') {
+      if (encryptedInput.length < 9) {
+        alert("Geçersiz şifre formatı.");
+        return;
+      }
+      key = encryptedInput.substring(1, 5);
+      const encodedDate = encryptedInput.substring(5, 9);
+      cipherText = encryptedInput.substring(9);
+      const decoded = decodeDate(encodedDate);
+      if (!decoded) {
+        alert("Geçersiz tarih kodu.");
+        return;
+      }
+      expectedMonth = decoded.month;
+      expectedDay = decoded.day;
+    } else {
+      alert("Geçersiz şifre formatı.");
+      return;
+    }
+    
+    // Anlık mesajlar dışındaki mesajlar için gerçek tarihi kontrol et (timeapi.io üzerinden)
+    if (prefix !== 'I') {
+      try {
+        const realDate = await getRealDate();
+        const currentMonth = realDate.getUTCMonth() + 1;
+        const currentDay = realDate.getUTCDate();
+        if (currentMonth !== expectedMonth || currentDay !== expectedDay) {
+          if (prefix === 'D') {
+            alert("Henüz belirlenen tarih gelmedi.");
+          } else {
+            alert("Henüz doğum günü gelmedi.");
+          }
+          return;
+        }
+      } catch (error) {
+        return;
+      }
+    }
+    
+    const decryptedMessage = decryptText(cipherText, key);
+    document.getElementById('decryptedOutput').value = decryptedMessage;
   }
   
   /* --- Gerçek Tarihi Al (timeapi.io üzerinden) --- */
@@ -304,75 +399,7 @@
       throw error;
     }
   }
-  
-  /* --- Mesaj Şifre Çözme Fonksiyonu --- */
-  async function decryptMessage() {
-    const encryptedInput = document.getElementById('encryptedInput').value.trim().toUpperCase();
-    if (encryptedInput.length < 5) {
-      alert("Geçerli bir şifre giriniz.");
-      return;
-    }
-    const prefix = encryptedInput.charAt(0);
-    let key = '';
-    let cipherText = '';
-    let expectedMonth, expectedDay;
-    
-    if (prefix === 'I') {
-      key = encryptedInput.substring(1, 5);
-      cipherText = encryptedInput.substring(5);
-    } else if (prefix === 'M' || prefix === 'F') {
-      key = encryptedInput.substring(1, 5);
-      cipherText = encryptedInput.substring(5);
-      if (prefix === 'M') {
-        expectedMonth = 1;
-        expectedDay = 14;
-      } else {
-        expectedMonth = 6;
-        expectedDay = 13;
-      }
-    } else if (prefix === 'D') {
-      if (encryptedInput.length < 9) {
-        alert("Geçersiz şifre formatı.");
-        return;
-      }
-      key = encryptedInput.substring(1, 5);
-      const encodedDate = encryptedInput.substring(5, 9);
-      cipherText = encryptedInput.substring(9);
-      const decoded = decodeDate(encodedDate);
-      if (!decoded) {
-        alert("Geçersiz tarih kodu.");
-        return;
-      }
-      expectedMonth = decoded.month;
-      expectedDay = decoded.day;
-    } else {
-      alert("Geçersiz şifre formatı.");
-      return;
-    }
-    
-    if (prefix !== 'I') {
-      try {
-        const realDate = await getRealDate();
-        const currentMonth = realDate.getUTCMonth() + 1;
-        const currentDay = realDate.getUTCDate();
-        if (currentMonth !== expectedMonth || currentDay !== expectedDay) {
-          if (prefix === 'D') {
-            alert("Henüz belirlenen tarih gelmedi.");
-          } else {
-            alert("Henüz doğum günü gelmedi.");
-          }
-          return;
-        }
-      } catch (error) {
-        return;
-      }
-    }
-    
-    const decryptedMessage = decryptText(cipherText, key);
-    document.getElementById('decryptedOutput').value = decryptedMessage;
-  }
 </script>
 </body>
 </html>
-
 
